@@ -3,6 +3,10 @@ A reimplementation of the word game "Wordle".
 
 Original game website: https://www.powerlanguage.co.uk/wordle/
 
-My version: https://bosorioo.github.io/wordle-unlimited/
+My version: https://juliusjacobsohn.github.io/wordle-unlimited/
 
-The solution and accepted-guess word lists are stored as standalone JSON files.
+## Changes in this fork
+
+- Moved the solution and accepted-guess word lists into standalone JSON files.
+- Added configurable annual date ranges with ordered word lists that are selected before random words.
+- Configured `latum` as the first word from July 19 at 15:00 until July 20 at 15:00, using the player's local time.
