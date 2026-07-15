@@ -523,6 +523,15 @@
     const dictionaries = {}
     let wordsGuessable = []
     let wordsAcceptedAsInput = []
+    // These local-time ranges repeat every year. Add more entries or words as needed.
+    const scheduledWordRanges = [
+      {
+        id: 'july-19-latum',
+        start: { month: 7, day: 19, hour: 15, minute: 0 },
+        end: { month: 7, day: 20, hour: 15, minute: 0 },
+        words: [ 'latum' ]
+      }
+    ]
     const state = {
       config: {
         attempts: 6,
@@ -540,7 +549,8 @@
       gamesWon: 0,
       victoryStreak: 0,
       victoryStreakRecord: 0,
-      guessDistribution: {}
+      guessDistribution: {},
+      scheduledWordProgress: {}
     }
 
     function cloneState () {
@@ -946,10 +956,56 @@
       return String(multiplier) + String((index * multiplier) ^ xor)
     }
 
-    function getWordToGuess (code) {
+    function getScheduleWindow (schedule, date) {
+      const year = date.getFullYear()
+      const start = new Date(year, schedule.start.month - 1, schedule.start.day,
+        schedule.start.hour || 0, schedule.start.minute || 0)
+      const end = new Date(year, schedule.end.month - 1, schedule.end.day,
+        schedule.end.hour || 0, schedule.end.minute || 0)
+
+      if (end <= start) {
+        if (date < end) {
+          start.setFullYear(year - 1)
+        } else {
+          end.setFullYear(year + 1)
+        }
+      }
+      return { start, end }
+    }
+
+    function getScheduledWordCandidate (date = new Date()) {
+      const dictionary = dictionaries[state.config.wordLength]
+      if (!dictionary) {
+        return
+      }
+
+      for (const schedule of scheduledWordRanges) {
+        const { start, end } = getScheduleWindow(schedule, date)
+        if (date < start || date >= end) {
+          continue
+        }
+
+        const progressKey = `${schedule.id}:${start.getFullYear()}`
+        const progress = Number(state.scheduledWordProgress[progressKey]) || 0
+        for (let index = progress; index < schedule.words.length; index++) {
+          const word = schedule.words[index].toLowerCase()
+          if (dictionary.wordsGuessable.has(word)) {
+            return { word, progressKey, nextIndex: index + 1 }
+          }
+        }
+      }
+    }
+
+    function getWordToGuess (code, date = new Date()) {
       const words = Array.from(dictionaries[state.config.wordLength].wordsGuessable || [])
       if (code) {
         return words[codeToWordIndex(code, words.length)]
+      }
+
+      const scheduledWord = getScheduledWordCandidate(date)
+      if (scheduledWord) {
+        state.scheduledWordProgress[scheduledWord.progressKey] = scheduledWord.nextIndex
+        return scheduledWord.word
       }
       return words[randomInteger(0, words.length - 1)]
     }
@@ -1438,8 +1494,17 @@
         } else {
           displayToast('Word from link is invalid.\nWill use random word', 8 * 1e3)
         }
-      } else if (!state.wordToGuess) {
-        resetGame()
+      } else {
+        const scheduledWord = getScheduledWordCandidate()
+        if (scheduledWord && state.wordsTried.length === 0) {
+          if (state.wordToGuess === scheduledWord.word) {
+            state.scheduledWordProgress[scheduledWord.progressKey] = scheduledWord.nextIndex
+          } else {
+            resetGame()
+          }
+        } else if (!state.wordToGuess) {
+          resetGame()
+        }
       }
 
       setupForCurrentState()
